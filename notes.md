@@ -26,6 +26,8 @@ Ait montré mon implémentation du BIO-LGCA, Vass dit que la partie aléatoire o
 Par contre concernant le fait que normalement l'interaction function dépend des lattices autour, il dit que c'est mieux si on continue sur notre lancée actuelle car 1) c'est plus proche de la réalité des cellules qui doivent communiquer entre elles 2) ça sera plus simple à implémenter sur la GPU   
 Il dit aussi que l'hexagone est important à terme parce que 1) y'a pas de coins, ce qui est mieux 2) les cellules en diagonales devraient être des voisines mais ne le sont pas dans une implémentation carrée.
 
+On a aussi discuté qu'en essence, la fonction d'interaction c'est simplement une fonction qui va de rest + communication channels à rest + communication, donc très facile de faire du data parallelizing avec.
+
 ### *Feuille de route*
 - Une fois la depth implémentée, on essaye de partir d'un rest state "oeuf" qui doit arriver à une figure définie. On essaye ça d'abord avec un carré. Le but est de poser une particule qui contient la longueur d'un demi-côté puis qu'elle évolue en un carré complet. Should be quite easy  
 - Une fois qu'on a l'oeuf, on passe à la poule, i.e un truc qui bouge. Donc le but est de montrer qu'on peut faire se déplacer des patterns. *Ça serait bien que j'arrive à faire en sorte que tout se déplace d'un coup et pas layer par layer. Aussi, faire une technique qui permet de faire se déplacer n'importe quel pattern.*
