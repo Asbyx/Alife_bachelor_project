@@ -9,7 +9,7 @@ import time
 
 # Initialize the automaton
 W, H = 60, 60
-model = Weird_LGCA()
+model = Aware_Lattices()
 auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
 # =============================================================================
 
@@ -20,7 +20,7 @@ screen = pygame.display.set_mode((W, H), flags=pygame.SCALED | pygame.RESIZABLE)
 clock = pygame.time.Clock()
 running = True
 camera = Camera(W, H)
-fps = 20
+fps = 2
 dt = 5 / fps
 
 # Initialize the world_state array, of size (W,H,3) of RGB values at each position.
@@ -70,7 +70,7 @@ while running:
             # Replace *'FFV1' by *'mp4v' and video extension by .mp4 if it doesn't work
             launch_video = False
             fourcc = cv2.VideoWriter_fourcc(*'FFV1')
-            vid_loc = './lgca.mkv'
+            vid_loc = './automaton.mkv'
             video_out = cv2.VideoWriter(vid_loc, fourcc, 30.0, (W, H))
 
         frame_bgr = cv2.cvtColor(auto.worldmap, cv2.COLOR_RGB2BGR)
@@ -91,6 +91,7 @@ while running:
     pygame.display.flip()
 
     clock.tick(fps)  # limits FPS
+
 
 pygame.quit()
 if (not launch_video):  # if video is launched

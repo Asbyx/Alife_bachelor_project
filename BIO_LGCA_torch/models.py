@@ -59,28 +59,27 @@ class Weird_LGCA(Model):
 
 class Aware_Lattices(Model):
     def interaction_function(self, world):
-        # Only consider alive cell
-        mask = world[:, :, 4] != 0
-
-        # Communication acknowledging
-        print(world[:, :, 0:4].shape)
-        print(world[:, :, 0:4][mask].shape)
-        min_received[mask] = torch.min(world[:, :, 0:4][mask], dim=2).values
+        # Identify dead cells
+        mask = world[:, :, 4] == 0
 
         # State updating
-        world[:, :, 4][mask] = min_received[mask]+1
+        world[:, :, 4] = torch.min(world[:, :, 0:4], dim=2).values + 1
+        # neutral channel     =       min of communication channels                  + 1
+
+        # killing cells that were dead but have been updated
+        world[:, :, 4][mask] = 0
 
         # Sending updated state
-        world[:, :, 0:4][mask] = world[:, :, 4][mask]
+        world[:, :, 0:4] = torch.stack([world[:, :, 4], world[:, :, 4], world[:, :, 4], world[:, :, 4]], dim=-1)
         return world
 
     def init_world(self, W, H):
+        self.target_depth = 7
         self.size = (W, H)
-        init = torch.zeros((self.size[0], self.size[1], 5), dtype=torch.uint8)
-        init[20:30, 20:30, 4] = 1
+        init = torch.distributions.Bernoulli(0.9).sample(torch.Size([self.size[0], self.size[1], 5]))
         return init
 
     def draw_function(self, world):
-        res = np.zeros((self.size[0], self.size[1], 3))
-        res = np.asarray([world[:, :, 4]/100, world[:, :, 4]/100, world[:, :, 4]/100]).transpose((1, 2, 0))
+        res = np.asarray([torch.zeros(self.size), world[:, :, 4]/self.target_depth, torch.zeros(self.size)]).transpose((1, 2, 0))
+        res[res[:, :, 1] == 0] = (0.2, 0.15, 0)
         return res
