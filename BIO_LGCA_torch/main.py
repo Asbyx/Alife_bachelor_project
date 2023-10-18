@@ -8,8 +8,8 @@ import cv2
 import time
 
 # Initialize the automaton
-W, H = 60, 60
-model = Depth_Aware_Lattices()
+W, H = 500, 500
+model = Naive_Seed_Square()
 auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
 # =============================================================================
 
@@ -20,7 +20,7 @@ screen = pygame.display.set_mode((W, H), flags=pygame.SCALED | pygame.RESIZABLE)
 clock = pygame.time.Clock()
 running = True
 camera = Camera(W, H)
-fps = 2
+fps = 120
 dt = 5 / fps
 
 # Initialize the world_state array, of size (W,H,3) of RGB values at each position.

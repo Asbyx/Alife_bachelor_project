@@ -56,7 +56,6 @@ class Weird_LGCA(Model):
         init[np.random.randint(1, W // 3 - 2, W), np.random.randint(1, H // 3 - 2, W), np.random.randint(1, 4, W)] = 1
         return init
 
-
 class Depth_Aware_Lattices(Model):
     """
     This model implements a depth awareness for the lattices (depth = depth in a aggregation of alive lattices).
@@ -71,11 +70,12 @@ class Depth_Aware_Lattices(Model):
         world[:, :, 4] = torch.min(world[:, :, 0:4], dim=2).values + 1
         # neutral channel     =       min of communication channels                  + 1
 
-        # killing cells that were dead but have been updated
+        # Killing cells that were dead but have been updated
         world[:, :, 4][mask] = 0
 
         # Sending updated state
-        world[:, :, 0:4] = torch.stack([world[:, :, 4], world[:, :, 4], world[:, :, 4], world[:, :, 4]], dim=-1)
+        world[:, :, 0:4] = torch.stack([world[:, :, 4], world[:, :, 4], world[:, :, 4], world[:, :, 4]], dim=-1)-1
+        world = torch.where(world < 0, 0, world)
         return world
 
     def init_world(self, W, H):
@@ -88,3 +88,27 @@ class Depth_Aware_Lattices(Model):
         res = np.asarray([torch.zeros(self.size), world[:, :, 4]/self.target_depth, torch.zeros(self.size)]).transpose((1, 2, 0))
         res[res[:, :, 1] == 0] = (0.2, 0.15, 0)
         return res
+
+class Naive_Seed_Square(Model):
+    """
+    This model implements the growing of a seed into a simple square of size seed_value*2.
+    """
+    def interaction_function(self, world):
+        # Growing of a new cell
+        world[:, :, 4] = torch.max(world, dim=2).values
+
+        # Transmitting state
+        world[:, :, :4] = torch.stack([world[:, :, 4], world[:, :, 4], world[:, :, 4], world[:, :, 4]], dim=-1) - 1
+        return world
+
+    def init_world(self, W, H):
+        self.size = (W, H)
+        self.seed_value = 200
+        init = torch.zeros((W, H, 5), dtype=torch.int16)
+        init[W//2, H//2, :] = self.seed_value
+        return init
+
+    def draw_function(self, world):
+        res = np.asarray([torch.zeros(self.size), world[:, :, 4] / (self.seed_value+1), torch.zeros(self.size)]).transpose((1, 2, 0))
+        return res
+
