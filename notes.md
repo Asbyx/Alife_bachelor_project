@@ -33,6 +33,7 @@ On a aussi discuté qu'en essence, la fonction d'interaction c'est simplement un
 - Une fois qu'on a l'oeuf, on passe à la poule, i.e un truc qui bouge. Donc le but est de montrer qu'on peut faire se déplacer des patterns. *Ça serait bien que j'arrive à faire en sorte que tout se déplace d'un coup et pas layer par layer. Aussi, faire une technique qui permet de faire se déplacer n'importe quel pattern.*
 
 ### *Autres pistes*
+- Faire un modèle qui grow un pattern qu'on définit en avance. Optimalement même, le pattern est encodé en tant qu'ADN dans le lattice
 - Implémenter avec les bestagones
 - Etudier l'émergence de patterns de plusieurs lattices qui se maintiennent stables
 - Etudier la self reproduction.
