@@ -57,7 +57,12 @@ class Weird_LGCA(Model):
         return init
 
 
-class Aware_Lattices(Model):
+class Depth_Aware_Lattices(Model):
+    """
+    This model implements a depth awareness for the lattices (depth = depth in a aggregation of alive lattices).
+    Each step, each cell communicates to its neighbors its known depth. Then each cell depth become the minimum received depth and add 1.
+    Finaly all dead cells remain dead and send nothing around them.
+    """
     def interaction_function(self, world):
         # Identify dead cells
         mask = world[:, :, 4] == 0

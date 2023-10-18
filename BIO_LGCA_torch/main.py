@@ -9,7 +9,7 @@ import time
 
 # Initialize the automaton
 W, H = 60, 60
-model = Aware_Lattices()
+model = Depth_Aware_Lattices()
 auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
 # =============================================================================
 
