@@ -38,6 +38,15 @@ On a aussi discuté qu'en essence, la fonction d'interaction c'est simplement un
 - Etudier l'émergence de patterns de plusieurs lattices qui se maintiennent stables
 - Etudier la self reproduction.
 
+# Meeting Vass 19 octobre
+Je continue d'implémenter les particules qui bougent seules et s'aggrègent, dans le but de faire une reproduction par ARN. C'est à dire qu'on veut implémenter des paires de lattices qui catchent d'autres lattices bougeant pour se reproduire.  
+
+Ça donnerait: un lattice A collisionne avec un G. Ils forment alors une paire qui va essayer de se reproduire. Ils catchent respectivement un T et un C puis les détachent. La nouvelle paire va alors avancer de TBD steps, avant de s'arrêter et essayer aussi de se reproduire.  
+Ça permet de faire une simulation particulesque et assez proche de la réalité.
+
+Sinon, on fait qqch de plus simple type: on pose un oeuf, il grow une créature, cette créature envoie des signaux comme un oursin, quand 2 signaux se rencontrent ils forment une nouvelle créature qui combine l'ADN qu'il y avait dans les signaux.  
+Ça permet de faire une simulation qui est bcp plus du type "cellular automata" mais avec une évolution darwinienne vraiment facile à faire.
+
 # Random ideas  
 **Notion d'aléatoire dans le paper:** pour le moment j'implémente un deterministic bio lgca. L'aléatoire décrite dans le paper est contenue dans la fonction d'interaction. En fait le passage d'un state à un autre est simplement une variable aléatoire *dépendante des cells voisines*. Un aspect que j'ai pour le moment complètement omis.
 
