@@ -8,9 +8,9 @@ import cv2
 import time
 
 # Initialize the automaton
-W, H = 500, 500
-model = Naive_Seed_Square()
-auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
+W, H = 25, 25
+model = Moving_Lattices()
+auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H, nb_lattices=100), model.interaction_function, model.draw_function)
 # =============================================================================
 
 # Initialize the pygame screen
@@ -20,7 +20,7 @@ screen = pygame.display.set_mode((W, H), flags=pygame.SCALED | pygame.RESIZABLE)
 clock = pygame.time.Clock()
 running = True
 camera = Camera(W, H)
-fps = 120
+fps = 20
 dt = 5 / fps
 
 # Initialize the world_state array, of size (W,H,3) of RGB values at each position.

@@ -112,3 +112,84 @@ class Naive_Seed_Square(Model):
         res = np.asarray([torch.zeros(self.size), world[:, :, 4] / (self.seed_value+1), torch.zeros(self.size)]).transpose((1, 2, 0))
         return res
 
+class Moving_Lattices(Model):
+    """
+    This model implement a lattice that moves in a straight line until it encounter another lattice in front of him. Then it stops
+    rest_channels: [
+            {0: air, 1: lattice moving, 2: lattice at rest},
+            direction of the moving lattice
+            ]
+
+    A movement consist of n step:
+        spot reservation (if several lattices try to take the spot at the same time, a random one is chosen)
+            Sending of a signal, the signal takes the rest channel and send a move signal to the lattice
+        movement
+    """
+    # signal codes
+    SEED = 10
+    STOP = 3
+    MOVE = 2
+    RESERVATION = 9
+
+    def interaction_function(self, world):
+        def fct(channels):
+            # air lattices interactions
+            if channels[4] == 0:
+                # if there is a seed in one communication channel, resulting in a new moving lattice
+                if (channels[:4] >= Moving_Lattices.SEED).any():
+                    channels[4] = 1
+                    channels[5] = channels[channels >= Moving_Lattices.SEED][0] - Moving_Lattices.SEED
+                    channels[:4] = Moving_Lattices.STOP
+
+                elif Moving_Lattices.RESERVATION in channels[:4]:
+                    # only one reservation
+                    if torch.sum(channels[channels == Moving_Lattices.RESERVATION]) == Moving_Lattices.RESERVATION:
+                        channels[:4] = torch.where(channels[:4] == Moving_Lattices.RESERVATION, Moving_Lattices.MOVE,
+                                                   Moving_Lattices.STOP).roll(2)
+                    # there are more than 1 reservation
+                    else:
+                        channels[torch.where(channels == Moving_Lattices.RESERVATION)[0][1:]] = channels[:4][
+                            channels[:4] != Moving_Lattices.RESERVATION] = Moving_Lattices.STOP
+                        channels[channels == Moving_Lattices.RESERVATION] = Moving_Lattices.MOVE
+                        channels[:4] = torch.roll(channels[:4], 2)
+                # if it not a seed nor a reservation, absorb it
+                else:
+                    channels[:4] = 0
+
+            # moving lattices interactions
+            elif channels[4] == 1:
+                if Moving_Lattices.MOVE in channels[int(((channels[5] + 2) % 4).item())]:
+                    direction = channels[5].clone().item()
+                    if torch.distributions.Bernoulli(0.05).sample(torch.Size([1]))[0]: direction = torch.randint(0, 4, (
+                    1,)).item()
+                    channels[:] = 0
+                    channels[direction] = Moving_Lattices.SEED + direction
+                elif Moving_Lattices.STOP in channels[
+                    int(((channels[5] + 2) % 4).item())] or Moving_Lattices.RESERVATION in channels[
+                    int(((channels[5] + 2) % 4).item())]:
+                    channels[4] = 2
+                else:
+                    channels[channels[5].clone().item()] = Moving_Lattices.RESERVATION
+            else:
+                # resting lattice
+                channels[:4] = torch.where(channels[:4] == Moving_Lattices.RESERVATION, Moving_Lattices.STOP, 0).roll(2)
+            return channels
+
+        for x in range(self.size[0]):
+            for y in range(self.size[1]):
+                world[x, y] = fct(world[x, y])
+        return world
+
+    def init_world(self, W, H, nb_lattices=None):
+        if nb_lattices is None: nb_lattices = W*2
+        self.size = (W, H)
+        init = torch.zeros((W, H, 6), dtype=torch.int8)
+        init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), 4] = 1
+        init[:, :, 5] = torch.where(init[:, :, 4] == 1, torch.randint(0, 4, self.size), init[:, :, 1])
+        return init
+
+    def draw_function(self, world):
+        moving_lattices_mask = (world[:, :, 4] == 1) | (world[:, :, 0] >= 10) | (world[:, :, 1] >= 10) | (world[:, :, 2] >= 10) | (world[:, :, 3] >= 10)
+        resting_lattices_mask = world[:, :, 4] == 2
+        res = np.asarray([moving_lattices_mask*1.0, moving_lattices_mask*1.0 - resting_lattices_mask*0.5, moving_lattices_mask*1.0]).transpose((1, 2, 0))
+        return res
