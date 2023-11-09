@@ -47,6 +47,30 @@ Je continue d'implémenter les particules qui bougent seules et s'aggrègent, da
 Sinon, on fait qqch de plus simple type: on pose un oeuf, il grow une créature, cette créature envoie des signaux comme un oursin, quand 2 signaux se rencontrent ils forment une nouvelle créature qui combine l'ADN qu'il y avait dans les signaux.  
 Ça permet de faire une simulation qui est bcp plus du type "cellular automata" mais avec une évolution darwinienne vraiment facile à faire.
 
+# Meeting Vass 09 novembre
+Pas grand chose de nouveau je continue sur la reproduction des paires d'ADN.  
+Pour l'autre direction, aka les bulles qui envoient des oeufs, on verra plus tard là on focus sur ADN.
+
+Les 2 pistes pour continuer actuellement: 
+- implémenter la séparation du child
+- faire la différenciation des particules (A, T, G, C)
+
+### Séparation du child:
+La gross difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  
+Ce qui serait bien c'est que cette reproduction influe l'environnement. Le cas trivial et celui proposé par Vass est que ça créé une autre paire qui essaye à son tour de se reproduire.
+Après c'est useless parce qu'il n'y a pas de mort des paires pour le moment, donc aucun sélection.
+
+Options:
+- Faire des particules oeufs qui se déplacent de N unité puis éclosent -> pb de la place encore une fois mais gérable avec des réservations
+- Faire des résas comme d'hab, sauf que les paires ont la prio. Donc protocole: les 2 lattices envoient une resa puis:
+  - Si c'est libre: ils informent leur paire que c'est libre
+  - Si les 2 sont libres (chaque lattice regarde lui même + signal de la paire) -> move
+  - Si 1 n'est pas libre -> wait
+Choix: faire les résas comme d'hab
+
+
+
+
 # Random ideas  
 **Notion d'aléatoire dans le paper:** pour le moment j'implémente un deterministic bio lgca. L'aléatoire décrite dans le paper est contenue dans la fonction d'interaction. En fait le passage d'un state à un autre est simplement une variable aléatoire *dépendante des cells voisines*. Un aspect que j'ai pour le moment complètement omis.
 
@@ -61,3 +85,20 @@ Il est aussi à noter que dans la vie, on utilise la matière disponible et on l
 Il est aussi intéressant de noter que le replicateur n'a pas besoin de popper par hasard, on peut avoir un simple pattern qui débouche sur l'auto repro., un peu à la manière de la fourmie de jsplus qui, qui suit un pattern chaotique avant de rentrer dans une boucle.  
 
 Une fois qu'on sait se faire se déplacer des patterns, essayer de faire se déplacer des patterns qui évoluent en se déplaçant.
+
+**Pour synchroniser des lattices** *(genre pour drop des grandes chaines ARN)* on peut simplement leur donner une clock interne et certaines actions ne peuvent être faites que si la clock est à 0
+
+**L'évolution requiert la mort, pour le moment y'a pas de mort**
+
+**Difficultés de ce modèle** 
+- On veut jouer avec le mouvement, mais le mouvement de lattices est compliqué et doit être harcodé
+
+**Pistes de recherches**
+J'aimerais bien faire de la recherche sur un algo simples qui trouve des solutions, un peu comme genetic algo, mais dans un CA ou particles simulation
+
+# Rendu:
+L'oral doit intéresser clément, il est intéressé par un petit talk (arn = intéressé de fou).
+Date: le plus tard c'est le mieux parce que ça donne le temps de faire des choses.
+Il veut pas que je le fasse pour la note, il veut que je le fasse parce que c'est un talk intéressant.
+
+comment augmenter le fond d'un labo à l'epfl ? clément: la négociation et le chantage
