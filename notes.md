@@ -66,7 +66,13 @@ Options:
   - Si c'est libre: ils informent leur paire que c'est libre
   - Si les 2 sont libres (chaque lattice regarde lui même + signal de la paire) -> move
   - Si 1 n'est pas libre -> wait
-Choix: faire les résas comme d'hab
+
+Choix: faire les résas comme d'hab, avec du coup un nouveau state pour les paris qui migrent:
+nouveau signal: reservation_pair, qui la priorité sur les réservations de lattice
+chaque pair envoie à l'autre si la case devant elle est dispo, et quand les deux sont ok -> ça bouge avec une seed
+Cas particuliers:
+- Si un free rencontre une resa_pair, qui va dans la direction opposée à lui il flip
+- Si la travelling pair rencontre une pair en train de grab, à travers un signal grabbing, **la travelling pair est dissoute (i.e les lattices deviennent free et partent dans des directions opposées)
 
 
 

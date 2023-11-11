@@ -208,7 +208,7 @@ class Reproducing_Pairs(Model):
         TBD (quand la reproduction est terminée, qu'est ce qu'il se passe ?)
     """
     # signal codes
-    SIGNAL_SEED = 10  # Must be the greater one ! Because it encodes the direction with it fixme: non, on peut juste check que la dizaine soit égale à 1
+    SIGNAL_SEED = 10  # Must be the greater one ! Because it encodes the direction with it
     SIGNAL_MOVE = 2
     SIGNAL_FLIP = 3
     SIGNAL_GRABED = 4
@@ -229,8 +229,8 @@ class Reproducing_Pairs(Model):
         def fct(channels):
             # air lattices interactions
             if channels[Reproducing_Pairs.STATE_CHANNEL] == 0:
-                # if there is a seed in one communication channel, resulting in a new moving lattice
-                if (channels[Reproducing_Pairs.COMM_CHANNELS] >= Reproducing_Pairs.SIGNAL_SEED).any():
+                # if there is a seed in one communication channel, resulting in a new free lattice
+                if (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_SEED == 1).any():
                     channels[Reproducing_Pairs.STATE_CHANNEL] = 1
                     channels[Reproducing_Pairs.DIR_CHANNEL] = channels[channels >= Reproducing_Pairs.SIGNAL_SEED][0] - Reproducing_Pairs.SIGNAL_SEED
                     channels[Reproducing_Pairs.COMM_CHANNELS] = 0
@@ -238,7 +238,7 @@ class Reproducing_Pairs(Model):
                 elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[Reproducing_Pairs.COMM_CHANNELS]:
                     # only one reservation
                     if torch.sum(channels[channels == Reproducing_Pairs.SIGNAL_RESERVATION]) == Reproducing_Pairs.SIGNAL_RESERVATION:
-                        channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_RESERVATION, Reproducing_Pairs.SIGNAL_MOVE, Reproducing_Pairs.SIGNAL_FLIP).roll(2).to(torch.int8)
+                        channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_RESERVATION, Reproducing_Pairs.SIGNAL_MOVE, 0).roll(2).to(torch.int8)
                     # there are more than 1 reservation
                     else:
                         channels[torch.where(channels == Reproducing_Pairs.SIGNAL_RESERVATION)[0][1:]] = channels[Reproducing_Pairs.COMM_CHANNELS][channels[Reproducing_Pairs.COMM_CHANNELS] != Reproducing_Pairs.SIGNAL_RESERVATION] = 0
@@ -330,7 +330,7 @@ class Reproducing_Pairs(Model):
         in_move_lattices_mask = (world[:, :, 0] >= 10) | (world[:, :, 1] >= 10) | (world[:, :, 2] >= 10) | (world[:, :, 3] >= 10)
         grabber_lattices_mask = world[:, :, 4] == Reproducing_Pairs.STATE_GRABBER
 
-        signal = None
+        signal = Reproducing_Pairs.SIGNAL_FLIP
         signals_mask = (world[:, :, 0] == signal) | (world[:, :, 1] == signal) | (world[:, :, 2] == signal) | (world[:, :, 3] == signal)
         res = np.asarray([moving_lattices_mask*1.0 - in_move_lattices_mask*0.2 + signals_mask*1.0, moving_lattices_mask*1.0 - grabber_lattices_mask*0.5 - in_move_lattices_mask*0.2, moving_lattices_mask*1.0 - in_move_lattices_mask*0.2]).transpose((1, 2, 0))
         return res
