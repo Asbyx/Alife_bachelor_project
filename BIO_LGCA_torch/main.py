@@ -10,7 +10,7 @@ import time
 # Initialize the automaton
 W, H = 19, 19
 model = Reproducing_Pairs()
-auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H, nb_lattices=20), model.interaction_function, model.draw_function)
+auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H, nb_lattices=40), model.interaction_function, model.draw_function)
 # =============================================================================
 
 # Initialize the pygame screen
