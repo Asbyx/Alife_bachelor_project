@@ -67,12 +67,12 @@ Options:
   - Si les 2 sont libres (chaque lattice regarde lui même + signal de la paire) -> move
   - Si 1 n'est pas libre -> wait
 
-Choix: faire les résas comme d'hab, avec du coup un nouveau state pour les paris qui migrent:
-nouveau signal: reservation_pair, qui la priorité sur les réservations de lattice
-chaque pair envoie à l'autre si la case devant elle est dispo, et quand les deux sont ok -> ça bouge avec une seed
+Choix: faire les résas comme d'hab, avec du coup un nouveau state pour les paris qui migrent:  
+Nouveau signal: reservation_pair, qui la priorité sur les réservations de lattice.  
+Chaque paire envoie à l'autre si la case devant elle est dispo, et quand les deux sont ok -> ça bouge avec une seed  
 Cas particuliers:
-- Si un free rencontre une resa_pair, qui va dans la direction opposée à lui il flip
-- Si la travelling pair rencontre une pair en train de grab, à travers un signal grabbing, **la travelling pair est dissoute (i.e les lattices deviennent free et partent dans des directions opposées)
+- Si un free rencontre une resa_pair qui va dans la direction opposée à lui, il flip
+- Si la travelling pair rencontre une pair en train de grab, à travers un signal grabbing, **la travelling pair est dissoute** (i.e les lattices deviennent free et partent dans des directions opposées)
 
 
 
@@ -94,10 +94,12 @@ Une fois qu'on sait se faire se déplacer des patterns, essayer de faire se dép
 
 **Pour synchroniser des lattices** *(genre pour drop des grandes chaines ARN)* on peut simplement leur donner une clock interne et certaines actions ne peuvent être faites que si la clock est à 0
 
-**L'évolution requiert la mort, pour le moment y'a pas de mort**
+**L'évolution requiert la mort, pour le moment y'a pas de mort dans BIO-LGCA**
 
-**Difficultés de ce modèle** 
+**Difficultés de ce modèle:**  
 - On veut jouer avec le mouvement, mais le mouvement de lattices est compliqué et doit être harcodé
+
+**Optimisations random:** On peut coder les interactions avec des if-else, puis un compilateur run tous les cas possibles pour faire un wati dictionnaire. Comme ça quand on run la simulation on peut simplement aller chercher dans le dico
 
 **Pistes de recherches**
 J'aimerais bien faire de la recherche sur un algo simples qui trouve des solutions, un peu comme genetic algo, mais dans un CA ou particles simulation

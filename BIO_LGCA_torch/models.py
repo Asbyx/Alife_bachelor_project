@@ -206,19 +206,33 @@ class Reproducing_Pairs(Model):
         2: Graber -> Grab ce qui passe autour de lui, laisse passer ce qui ne l'intéresse pas ou le fait rebondir. Envoie à sa paire un signal qui dit si il a grab une particule, et si oui selon quel axe
         Grabbed -> Fait tout rebondir sur lui
         TBD (quand la reproduction est terminée, qu'est ce qu'il se passe ?)
+
+    Fixme Known bugs:
+        - on: right - up - left, the reservation signal passes through the up, and the two free cells therefore become grabbers but are 1 cell appart
+
+    optimization / pbs to fix:
+        - One could simply do a dictionnary that contains the the mapping function
+        - The comm channels should be reset by default
     """
     # signal codes
-    SIGNAL_SEED = 10  # Must be the greater one ! Because it encodes the direction with it
+    SIGNAL_OK = 1
     SIGNAL_MOVE = 2
     SIGNAL_FLIP = 3
     SIGNAL_GRABED = 4
     SIGNAL_GRABING = 5
-    SIGNAL_HAS_GRABED = [6, 7]  # 6 means up, 7 means down
+    SIGNAL_HAS_GRABED = [6, 7]  # 6 means that the grabbed is in direction [0, 1], 7 means in [2, 3]
+    SIGNAL_PAIR_RESERVATION = 8
     SIGNAL_RESERVATION = 9
+    SIGNAL_PAIR_DISBAND = 90
+
+    # signals that encodes several information
+    SIGNAL_SEED = 10  # only needs 1 extra encoding channel
+    SIGNAL_TRAVELLING_SEED = 1000 # needs 2 channels, in which 1 can take values in [0, 99]
 
     # states
     STATE_FREE = 1
     STATE_GRABBER = 2
+    STATE_TRAVELLING = 3
 
     # channels
     COMM_CHANNELS = range(4)
@@ -231,11 +245,17 @@ class Reproducing_Pairs(Model):
             if channels[Reproducing_Pairs.STATE_CHANNEL] == 0:
                 # if there is a seed in one communication channel, resulting in a new free lattice
                 if (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_SEED == 1).any():
-                    channels[Reproducing_Pairs.STATE_CHANNEL] = 1
-                    channels[Reproducing_Pairs.DIR_CHANNEL] = channels[channels >= Reproducing_Pairs.SIGNAL_SEED][0] - Reproducing_Pairs.SIGNAL_SEED
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = channels[channels // Reproducing_Pairs.SIGNAL_SEED == 1][0] - Reproducing_Pairs.SIGNAL_SEED
                     channels[Reproducing_Pairs.COMM_CHANNELS] = 0
 
-                elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[Reproducing_Pairs.COMM_CHANNELS]:
+                elif (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED == 1).any():
+                    DNA = channels[channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_SEED == 1][0] - Reproducing_Pairs.SIGNAL_TRAVELLING_SEED
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = DNA
+                    channels[Reproducing_Pairs.COMM_CHANNELS] = 0
+
+                elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[Reproducing_Pairs.COMM_CHANNELS] and Reproducing_Pairs.SIGNAL_PAIR_RESERVATION not in channels[Reproducing_Pairs.COMM_CHANNELS]:
                     # only one reservation
                     if torch.sum(channels[channels == Reproducing_Pairs.SIGNAL_RESERVATION]) == Reproducing_Pairs.SIGNAL_RESERVATION:
                         channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_RESERVATION, Reproducing_Pairs.SIGNAL_MOVE, 0).roll(2).to(torch.int8)
@@ -243,6 +263,15 @@ class Reproducing_Pairs(Model):
                     else:
                         channels[torch.where(channels == Reproducing_Pairs.SIGNAL_RESERVATION)[0][1:]] = channels[Reproducing_Pairs.COMM_CHANNELS][channels[Reproducing_Pairs.COMM_CHANNELS] != Reproducing_Pairs.SIGNAL_RESERVATION] = 0
                         channels[channels == Reproducing_Pairs.SIGNAL_RESERVATION] = Reproducing_Pairs.SIGNAL_MOVE
+                        channels[Reproducing_Pairs.COMM_CHANNELS] = torch.roll(channels[Reproducing_Pairs.COMM_CHANNELS], 2)
+
+                elif Reproducing_Pairs.SIGNAL_PAIR_RESERVATION in channels[Reproducing_Pairs.COMM_CHANNELS]:
+                    if torch.sum(channels[channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION]) == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION:
+                        channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION, Reproducing_Pairs.SIGNAL_MOVE, 0).roll(2).to(torch.int8)
+                    # there are more than 1 reservation
+                    else:
+                        channels[torch.where(channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION)[0][torch.randint(0, torch.sum(channels[channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION])/Reproducing_Pairs.SIGNAL_PAIR_RESERVATION, (1,)).item()]] = channels[channels != Reproducing_Pairs.SIGNAL_PAIR_RESERVATION] = 0
+                        channels[channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION] = 0
                         channels[Reproducing_Pairs.COMM_CHANNELS] = torch.roll(channels[Reproducing_Pairs.COMM_CHANNELS], 2)
                 # if it not a seed nor a reservation, absorb it
                 else:
@@ -258,20 +287,25 @@ class Reproducing_Pairs(Model):
 
                 elif Reproducing_Pairs.SIGNAL_GRABING in channels[Reproducing_Pairs.COMM_CHANNELS]:  # You have been grabbed !
                     dir_grabbed = (index_of(channels[Reproducing_Pairs.COMM_CHANNELS], Reproducing_Pairs.SIGNAL_GRABING) + 2) % 4
-                    # set all comm channels to FLIP, except the one to dir_grabbed which must be GRABED
-                    channels[Reproducing_Pairs.COMM_CHANNELS] = Reproducing_Pairs.SIGNAL_FLIP
+                    # set all comm channels to FLIP, except the one to dir_grabbed which must be GRABED and if a travelling pair tries to make a reservation
+                    channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION, Reproducing_Pairs.SIGNAL_PAIR_DISBAND, Reproducing_Pairs.SIGNAL_FLIP).to(torch.int8)
                     channels[dir_grabbed] = Reproducing_Pairs.SIGNAL_GRABED
+
+                elif (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED == 1).any():
+                    seed =
 
                 elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_RESERVATION
 
-                elif Reproducing_Pairs.SIGNAL_FLIP in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
+                elif Reproducing_Pairs.SIGNAL_FLIP in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]\
+                        or Reproducing_Pairs.SIGNAL_PAIR_RESERVATION in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     channels[Reproducing_Pairs.DIR_CHANNEL] = (channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4
+
                 else:
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_RESERVATION
 
-            elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_GRABBER:
+            elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_GRABBER or channels[Reproducing_Pairs.STATE_CHANNEL] < 0:
                 channels[Reproducing_Pairs.COMM_CHANNELS] = channels[Reproducing_Pairs.COMM_CHANNELS].roll(2)  # allow to have the correct directions right away
                 # retrieve the important signals, i.e the signal coming from the pair and the signal of a grabbed particle
                 dir_grabed = index_of(channels, Reproducing_Pairs.SIGNAL_GRABED)
@@ -281,9 +315,17 @@ class Reproducing_Pairs(Model):
                 channels[Reproducing_Pairs.COMM_CHANNELS] = Reproducing_Pairs.SIGNAL_FLIP
                 channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = 0
 
+                if channels[Reproducing_Pairs.STATE_CHANNEL] < -1:
+                    channels[Reproducing_Pairs.STATE_CHANNEL] += 1
+                    return channels
+                elif channels[Reproducing_Pairs.STATE_CHANNEL] == -1:
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
+                    return channels
+
                 if dir_grabed != -1 and pair_has_grabed != 0:
-                    # reproduction, todo
-                    raise Exception("Seggs not implemented")
+                    # releasing the child !
+                    channels[dir_grabed] = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED + 10*5 + channels[Reproducing_Pairs.DIR_CHANNEL]  # todo: reception de ce signal
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = -10
 
                 elif dir_grabed != -1:
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_HAS_GRABED[0 if dir_grabed in [0, 1] else 1]
@@ -291,13 +333,51 @@ class Reproducing_Pairs(Model):
 
                 elif pair_has_grabed:
                     # we need to determine whether we are searching for up or down, now that the pair has a grab
-                    dir_to_grab = (1 if pair_has_grabed == Reproducing_Pairs.SIGNAL_HAS_GRABED[0] else 3) - (channels[Reproducing_Pairs.DIR_CHANNEL]%2)
+                    dir_to_grab = (1 if pair_has_grabed == Reproducing_Pairs.SIGNAL_HAS_GRABED[0] else 3) - (channels[Reproducing_Pairs.DIR_CHANNEL] % 2)
                     channels[dir_to_grab % 4] = Reproducing_Pairs.SIGNAL_GRABING
 
                 else:
                     # we try to grab up and down
                     channels[(channels[Reproducing_Pairs.DIR_CHANNEL] - 1) % 4], channels[(channels[Reproducing_Pairs.DIR_CHANNEL] + 1) % 4] = Reproducing_Pairs.SIGNAL_GRABING, Reproducing_Pairs.SIGNAL_GRABING
 
+            elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_TRAVELLING:
+                # for travelling pairs, the dir_channel encode the direction of movement, the position of the pair and the number of steps left they have s.t: channel = pairdir*1000 + #steps*10 + dir
+                channels[Reproducing_Pairs.COMM_CHANNELS] = channels[Reproducing_Pairs.COMM_CHANNELS].roll(2)
+                pair_dir = channels[Reproducing_Pairs.DIR_CHANNEL] // 1000
+
+                # the pair is disbanded if it receives a grabing signal
+                if Reproducing_Pairs.SIGNAL_GRABING in channels[Reproducing_Pairs.COMM_CHANNELS] \
+                        or Reproducing_Pairs.SIGNAL_PAIR_DISBAND in channels[Reproducing_Pairs.COMM_CHANNELS]:
+                    channels[:] = 0
+                    channels[pair_dir] = Reproducing_Pairs.SIGNAL_PAIR_DISBAND
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = (pair_dir + 2) % 4
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
+                    return channels
+
+                # if the pair has no steps left, they switch to the grabber state todo: pas logique de le faire là, plutot jouer avec la seed
+                elif (channels[Reproducing_Pairs.DIR_CHANNEL] % 1000) // 10 == 0:
+                    channels[:] = 0
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = pair_dir
+                    return channels
+
+                is_resa_ok = Reproducing_Pairs.SIGNAL_MOVE in channels[Reproducing_Pairs.COMM_CHANNELS]
+                is_pair_ok = channels[pair_dir] == Reproducing_Pairs.SIGNAL_OK
+
+                # we move
+                if is_pair_ok and is_resa_ok:  # 10*number of steps + dir of the pair. Therefore, we substract 10 to remove 1 step.
+                    seed = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED + channels[Reproducing_Pairs.DIR_CHANNEL] - 10
+                    channels[channels[Reproducing_Pairs.DIR_CHANNEL] % 10] = seed
+                    channels[channels != seed] = 0
+                    return channels
+
+                channels[Reproducing_Pairs.COMM_CHANNELS] = 0
+                channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_PAIR_RESERVATION
+
+                # we inform the pair
+                if is_resa_ok:
+                    channels[pair_dir] = Reproducing_Pairs.SIGNAL_OK
+                    # todo: faut continuer la resa, sinon un free peut se mettre sur la route
             return channels
 
         for x in range(self.size[0]):
@@ -309,14 +389,16 @@ class Reproducing_Pairs(Model):
         if nb_lattices is None: nb_lattices = W*2
         self.size = (W, H)
         init = torch.zeros((W, H, 6), dtype=torch.int8)
-        init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
-        init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, 5])
+
+        # Random simulation
+        # init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
+        # init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, 5])
 
         # toy example horizontal
-        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
-        # init[10, 5, Reproducing_Pairs.STATE_CHANNEL] = 1
-        # init[12, 4, Reproducing_Pairs.STATE_CHANNEL] = 1
-        # init[0, 4, Reproducing_Pairs.STATE_CHANNEL], init[0, 4, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
+        init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
+        init[10, 5, Reproducing_Pairs.STATE_CHANNEL] = 1
+        init[11, 6, Reproducing_Pairs.STATE_CHANNEL] = 1
+        init[4, 6, Reproducing_Pairs.STATE_CHANNEL], init[4, 6, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
 
         # toy example vertical
         # init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = 1, 3
@@ -330,7 +412,7 @@ class Reproducing_Pairs(Model):
         in_move_lattices_mask = (world[:, :, 0] >= 10) | (world[:, :, 1] >= 10) | (world[:, :, 2] >= 10) | (world[:, :, 3] >= 10)
         grabber_lattices_mask = world[:, :, 4] == Reproducing_Pairs.STATE_GRABBER
 
-        signal = Reproducing_Pairs.SIGNAL_FLIP
+        signal = Reproducing_Pairs.SIGNAL_GRABING
         signals_mask = (world[:, :, 0] == signal) | (world[:, :, 1] == signal) | (world[:, :, 2] == signal) | (world[:, :, 3] == signal)
         res = np.asarray([moving_lattices_mask*1.0 - in_move_lattices_mask*0.2 + signals_mask*1.0, moving_lattices_mask*1.0 - grabber_lattices_mask*0.5 - in_move_lattices_mask*0.2, moving_lattices_mask*1.0 - in_move_lattices_mask*0.2]).transpose((1, 2, 0))
         return res
