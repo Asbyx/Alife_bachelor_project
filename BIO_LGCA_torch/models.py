@@ -227,7 +227,7 @@ class Reproducing_Pairs(Model):
 
     # signals that encodes several information
     SIGNAL_SEED = 10  # only needs 1 extra encoding channel
-    SIGNAL_TRAVELLING_SEED = 1000 # needs 2 channels, in which 1 can take values in [0, 99]
+    SIGNAL_TRAVELLING_SEED = 1000  # needs 2 channels, in which 1 can take values in [0, 99]
 
     # states
     STATE_FREE = 1
@@ -238,12 +238,10 @@ class Reproducing_Pairs(Model):
     COMM_CHANNELS = range(4)
     STATE_CHANNEL = 4
     DIR_CHANNEL = 5
-    CLK_CHANNEL = 6
+    SENT_CHANNEL = 6  # check if the lattice has sent a signal
 
     def interaction_function(self, world):
         def fct(channels):
-            channels[Reproducing_Pairs.CLK_CHANNEL] = not channels[Reproducing_Pairs.CLK_CHANNEL]
-
             # air lattices interactions
             if channels[Reproducing_Pairs.STATE_CHANNEL] == 0:
                 # if there is a seed in one communication channel, resulting in a new free lattice
@@ -329,15 +327,15 @@ class Reproducing_Pairs(Model):
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
                     return channels
 
-                if dir_grabed != -1 and pair_has_grabed != 0 and channels[Reproducing_Pairs.CLK_CHANNEL]:
+                if dir_grabed != -1 and pair_has_grabed != 0 and channels[Reproducing_Pairs.SENT_CHANNEL]:
                     # releasing the child !
-                    channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_HAS_GRABED[0 if dir_grabed in [0, 1] else 1]
                     channels[dir_grabed] = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED*(channels[Reproducing_Pairs.DIR_CHANNEL]+1) + 10*5 + dir_grabed
                     channels[Reproducing_Pairs.STATE_CHANNEL] = -20
 
                 elif dir_grabed != -1:
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_HAS_GRABED[0 if dir_grabed in [0, 1] else 1]
                     channels[dir_grabed] = Reproducing_Pairs.SIGNAL_GRABING
+                    channels[Reproducing_Pairs.SENT_CHANNEL] = 1
 
                 elif pair_has_grabed:
                     # we need to determine whether we are searching for up or down, now that the pair has a grab
@@ -347,6 +345,7 @@ class Reproducing_Pairs(Model):
                 else:
                     # we try to grab up and down
                     channels[(channels[Reproducing_Pairs.DIR_CHANNEL] - 1) % 4], channels[(channels[Reproducing_Pairs.DIR_CHANNEL] + 1) % 4] = Reproducing_Pairs.SIGNAL_GRABING, Reproducing_Pairs.SIGNAL_GRABING
+                    channels[Reproducing_Pairs.SENT_CHANNEL] = 0
 
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_TRAVELLING:
                 # for travelling pairs, the dir_channel encode the direction of movement, the position of the pair and the number of steps left they have s.t: channel = pairdir*1000 + #steps*10 + dir
@@ -374,9 +373,10 @@ class Reproducing_Pairs(Model):
                 is_pair_ok = channels[pair_dir] == Reproducing_Pairs.SIGNAL_OK
 
                 # we move
-                if is_pair_ok and is_resa_ok and channels[Reproducing_Pairs.CLK_CHANNEL]:  # 10*number of steps + dir of the pair. Therefore, we substract 10 to remove 1 step.
+                if is_pair_ok and is_resa_ok and channels[Reproducing_Pairs.SENT_CHANNEL]:  # 10*number of steps + dir of the pair. Therefore, we substract 10 to remove 1 step.
                     seed = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED + channels[Reproducing_Pairs.DIR_CHANNEL] - 10
                     channels[direction] = seed
+                    channels[pair_dir] = Reproducing_Pairs.SIGNAL_OK
                     channels[channels != seed] = 0
                     return channels
 
@@ -386,6 +386,9 @@ class Reproducing_Pairs(Model):
                 # we inform the pair
                 if is_resa_ok:
                     channels[pair_dir] = Reproducing_Pairs.SIGNAL_OK
+                    channels[Reproducing_Pairs.SENT_CHANNEL] = 1
+                else:
+                    channels[Reproducing_Pairs.SENT_CHANNEL] = 0
             return channels
 
         for x in range(self.size[0]):

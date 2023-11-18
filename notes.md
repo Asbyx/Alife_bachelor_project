@@ -92,7 +92,8 @@ Il est aussi intéressant de noter que le replicateur n'a pas besoin de popper p
 
 Une fois qu'on sait se faire se déplacer des patterns, essayer de faire se déplacer des patterns qui évoluent en se déplaçant.
 
-**Pour synchroniser des lattices** *(genre pour drop des grandes chaines ARN)* on peut simplement leur donner une clock interne et certaines actions ne peuvent être faites que si la clock est à 0
+**Pour synchroniser des lattices** *(genre pour drop des grandes chaines ARN)* on peut simplement leur donner une clock interne et certaines actions ne peuvent être faites que si la clock est à 0  
+*Problème de la clock:* Si tu as un signal qui requiert que qqch du type (`lattice à coté` && `moi`), même si tu les synchronises avec un clock, il peut y avoir une situation où "moi" ne communique pas avec le lattice d'à côté, et donc celui d'à coté ne reçoit pas l'info qu'il doit bouger
 
 **L'évolution requiert la mort, pour le moment y'a pas de mort dans BIO-LGCA**
 
@@ -103,6 +104,8 @@ Une fois qu'on sait se faire se déplacer des patterns, essayer de faire se dép
 
 **Pistes de recherches**
 J'aimerais bien faire de la recherche sur un algo simples qui trouve des solutions, un peu comme genetic algo, mais dans un CA ou particles simulation
+
+**Comportement non prévu du biolgca**: 2 organismes peuvent former une clock intéressantes (ils s'envoient des travelling pairs lul). Et je pense qu'on peut montrer que c'est Turing complete :) parce que des portes sont faisables
 
 # Rendu:
 L'oral doit intéresser clément, il est intéressé par un petit talk (arn = intéressé de fou).
