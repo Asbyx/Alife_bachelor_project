@@ -283,6 +283,8 @@ class Reproducing_Pairs(Model):
 
             # moving lattices interactions
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_FREE:
+                if torch.distributions.Bernoulli(0.01).sample(torch.Size([1]))[0]: channels[Reproducing_Pairs.DIR_CHANNEL] = torch.randint(0, 4, (1,)).item()
+
                 # absorbtion of the reservation signals
                 channels[(
                     ((channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION) | (channels == Reproducing_Pairs.SIGNAL_RESERVATION)) &
@@ -292,7 +294,6 @@ class Reproducing_Pairs(Model):
                 if Reproducing_Pairs.SIGNAL_MOVE in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     direction = channels[Reproducing_Pairs.DIR_CHANNEL].clone().item()
                     dna = channels[Reproducing_Pairs.DNA_CHANNEL].clone().item()
-                    if torch.distributions.Bernoulli(0.05).sample(torch.Size([1]))[0]: direction = torch.randint(0, 4, (1,)).item()
                     channels[:] = 0
                     channels[direction] = Reproducing_Pairs.SIGNAL_SEED + dna*Reproducing_Pairs.SIGNAL_SEED/10 + direction
 
@@ -358,14 +359,13 @@ class Reproducing_Pairs(Model):
 
                 elif dir_grabed != -1:
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_HAS_GRABED[0 if dir_grabed in [0, 1] else 1]
-                    channels[dir_grabed] = Reproducing_Pairs.SIGNAL_GRABING
+                    channels[dir_grabed] = Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL]
                     channels[Reproducing_Pairs.MEMORY_CHANNEL] = 1
 
                 elif pair_has_grabed:
                     # we need to determine whether we are searching for up or down, now that the pair has a grab
                     dir_to_grab = (1 if pair_has_grabed == Reproducing_Pairs.SIGNAL_HAS_GRABED[0] else 3) - (channels[Reproducing_Pairs.DIR_CHANNEL] % 2)
                     channels[dir_to_grab % 4] = Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL]
-
                 else:
                     # we try to grab up and down
                     channels[(channels[Reproducing_Pairs.DIR_CHANNEL] - 1) % 4], channels[(channels[Reproducing_Pairs.DIR_CHANNEL] + 1) % 4] = Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL], Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL]
@@ -425,7 +425,7 @@ class Reproducing_Pairs(Model):
     def init_world(self, W, H, nb_lattices=None):
         if nb_lattices is None: nb_lattices = W*2
         self.size = (W, H)
-        init = torch.zeros((W, H, 11), dtype=torch.int16)
+        init = torch.zeros((W, H, 8), dtype=torch.int16)
 
         # Random simulation
         init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
@@ -446,7 +446,7 @@ class Reproducing_Pairs(Model):
         # init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 0
         # init[5, 10, Reproducing_Pairs.STATE_CHANNEL], init[5, 10, Reproducing_Pairs.DIR_CHANNEL], init[5, 10, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 1
         # init[6, 2, Reproducing_Pairs.STATE_CHANNEL], init[6, 2, Reproducing_Pairs.DIR_CHANNEL], init[6, 2, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 2
-        # init[6, 15, Reproducing_Pairs.STATE_CHANNEL], init[6, 15, Reproducing_Pairs.DIR_CHANNEL], init[6, 15, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 3
+        # init[6, 3, Reproducing_Pairs.STATE_CHANNEL], init[6, 3, Reproducing_Pairs.DIR_CHANNEL], init[6, 3, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 3
         return init
 
     def draw_function(self, world):
