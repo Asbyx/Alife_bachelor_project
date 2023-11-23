@@ -51,12 +51,18 @@ Sinon, on fait qqch de plus simple type: on pose un oeuf, il grow une créature,
 Pas grand chose de nouveau je continue sur la reproduction des paires d'ADN.  
 Pour l'autre direction, aka les bulles qui envoient des oeufs, on verra plus tard là on focus sur ADN.
 
-Les 2 pistes pour continuer actuellement: 
-- implémenter la séparation du child
-- faire la différenciation des particules (A, T, G, C)
+Les pistes pour continuer actuellement: 
+- implémenter la séparation du child *(fait)*
+- faire la différenciation des particules (A, T, G, C) *(en cours)*
+- mort des paires au bout d'un moment 
+- faire un meilleur code parce que là c'est catastrophique:
+  - Séparer les interactions dans des sous-fonctions, pour que ce soit lisible et + facile de modifier un comportement spécifique
+  - Mettre plus de channels dans les comm channels pour pouvoir faire passer + d'infos
+  - Tout passer en bit signals pour implémenter l'optimisation par dictionnaire
+
 
 ### Séparation du child:
-La gross difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  
+La grosse difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  
 Ce qui serait bien c'est que cette reproduction influe l'environnement. Le cas trivial et celui proposé par Vass est que ça créé une autre paire qui essaye à son tour de se reproduire.
 Après c'est useless parce qu'il n'y a pas de mort des paires pour le moment, donc aucun sélection.
 
@@ -98,9 +104,12 @@ Une fois qu'on sait se faire se déplacer des patterns, essayer de faire se dép
 **L'évolution requiert la mort, pour le moment y'a pas de mort dans BIO-LGCA**
 
 **Difficultés de ce modèle:**  
-- On veut jouer avec le mouvement, mais le mouvement de lattices est compliqué et doit être harcodé
+- On veut jouer avec le mouvement, mais le mouvement de lattices est compliqué et doit être harcodé.  
+En fait cela me conforte dans l'idée que l'automaton de Clément est un peu l'automaton ultime, car les particules sont libres de bouger comme elles veulent, ce qui est bcp plus réaliste quand même, mais le fait de run une sorte de cellular automata entre les cellules proches permet de simuler les envois de protéines ou jsp quoi entre les cellules. A creuser.
 
-**Optimisations random:** On peut coder les interactions avec des if-else, puis un compilateur run tous les cas possibles pour faire un wati dictionnaire. Comme ça quand on run la simulation on peut simplement aller chercher dans le dico
+**Optimisations random:** 
+On peut coder les interactions avec des if-else, puis un compilateur run tous les cas possibles pour faire un wati dictionnaire. Comme ça quand on run la simulation on peut simplement aller chercher dans le dico.  
+Encore plus simple: Si tous les channels ne sont que des 0 et des 1, alors un lattice est simplement une suite binaire, ce qui peut être mappé sur un nombre. Pour faire le dico, on peut donc simplement rentrer tous les nombres possibles, voir vers quel nombre il est mappé et bim, on a notre dico qui tournera en O(1)
 
 **Pistes de recherches**
 J'aimerais bien faire de la recherche sur un algo simples qui trouve des solutions, un peu comme genetic algo, mais dans un CA ou particles simulation
