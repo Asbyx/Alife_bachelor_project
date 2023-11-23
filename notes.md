@@ -38,6 +38,7 @@ On a aussi discuté qu'en essence, la fonction d'interaction c'est simplement un
 - Etudier l'émergence de patterns de plusieurs lattices qui se maintiennent stables
 - Etudier la self reproduction.
 
+
 # Meeting Vass 19 octobre
 Je continue d'implémenter les particules qui bougent seules et s'aggrègent, dans le but de faire une reproduction par ARN. C'est à dire qu'on veut implémenter des paires de lattices qui catchent d'autres lattices bougeant pour se reproduire.  
 
@@ -46,6 +47,7 @@ Je continue d'implémenter les particules qui bougent seules et s'aggrègent, da
 
 Sinon, on fait qqch de plus simple type: on pose un oeuf, il grow une créature, cette créature envoie des signaux comme un oursin, quand 2 signaux se rencontrent ils forment une nouvelle créature qui combine l'ADN qu'il y avait dans les signaux.  
 Ça permet de faire une simulation qui est bcp plus du type "cellular automata" mais avec une évolution darwinienne vraiment facile à faire.
+
 
 # Meeting Vass 09 novembre
 Pas grand chose de nouveau je continue sur la reproduction des paires d'ADN.  
@@ -60,6 +62,13 @@ Les pistes pour continuer actuellement:
   - Mettre plus de channels dans les comm channels pour pouvoir faire passer + d'infos
   - Tout passer en bit signals pour implémenter l'optimisation par dictionnaire
 
+
+# Meeting Vass 23 novembre
+On continue selon les pistes vues au dessus.
+Pour les chaînes plus longues, on a brainstormé un peu, la solution la + simple est de faire qqch d'elastique, c'est à dire que quand une chaine veut bouger, simplement elle fait avancer 1 lattice, puis les autres de la chaîne se rendent compte que leur voisin manque du coup ils avancent.  
+Et pour détecter quand bouger, le plus simple serait de trouver un moyen pour les lattices d'une chaîne de connaître la longueur de leur chaîne. Puis quand quand la chaîne fille se rend compte qu'elle a la longueur de la chaîne mère, elle se décroche. Ou alors une fois que tous les lattices parents acknowledgent qu'ils ont grab, on relâche un lattice child au pif, puis l'elasticité fera le reste (les bouts de chaines préviennent quand ils ont bougé permettant au leader de la chaine d'avancer quand tout le monde est là).   
+Le plus gros problème c'est les obstacles. Mais en y réfléchissant, c'est pas trop un problème car les free vont juste dégager au bout d'un moment, permettant à l'elasticité de continuer. Sauf si on rencontre une autre chaîne fixée, mais on pourrait du coup dissoudre la chaîne qui voyage, où une chaîne qui bouge, là c'est plus relou. Une solution ce serait de faire des réservations et de ne bouger que lorsque tout le monde est prêt.
+Reflexion to be continued.
 
 ### Séparation du child:
 La grosse difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  

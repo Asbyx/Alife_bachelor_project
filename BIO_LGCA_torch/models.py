@@ -193,6 +193,7 @@ class Moving_Lattices(Model):
 
 class Reproducing_Pairs(Model):
     """
+    todo update description
     Le but est de faire que: quand 2 cellules se rencontrent, elle commence à tenter de faire des nouvelles paires qui sont des copies d'elles-même, comme l'ARN.
     Pour cela elles grabbent autour d'elles les cellules compatibles (envoie un signal grab qui permet de stopper de force une cellule qui passerait et la force à communiquer avec le grabber)
     Les cellules non-compatibles rebondissent simplement, et les cellules grabbed font tout rebondire.
@@ -205,14 +206,12 @@ class Reproducing_Pairs(Model):
         1: Free -> bouge librement en attendant une collision ou un grab
         2: Graber -> Grab ce qui passe autour de lui, laisse passer ce qui ne l'intéresse pas ou le fait rebondir. Envoie à sa paire un signal qui dit si il a grab une particule, et si oui selon quel axe
         Grabbed -> Fait tout rebondir sur lui
-        TBD (quand la reproduction est terminée, qu'est ce qu'il se passe ?)
-
-    Fixme Known bugs:
-        - DNA is lost for travelling pairs
 
     optimization / pbs to fix:
         - One could simply do a dictionnary that contains the the mapping function
         - The comm channels should be reset by default
+
+    Fixme Current bug to be solved: in the random simulation, the grabber don't grab for some reason, while in the toy examples it works fine.
     """
     # signal codes
     SIGNAL_OK = 1
@@ -225,9 +224,9 @@ class Reproducing_Pairs(Model):
     SIGNAL_PAIR_DISBAND = 90
 
     # signals that encodes several information
-    SIGNAL_SEED = 100  # only needs 2 extra encoding channel
+    SIGNAL_SEED = 100  # only needs 2 extra encoding channel (in fact i'm dumb, it only needs 1 encoding channel, for the DNA. The information for the direction is already given in the index of the channel that gets the seed)
     SIGNAL_GRABING = 50  # only needs 1
-    SIGNAL_TRAVELLING_SEED = 1000  # needs 2 channels, in which 1 can take values in [0, 99]
+    SIGNAL_TRAVELLING_SEED = 1000  # needs 3 channels
 
     # states
     STATE_FREE = 1
@@ -246,16 +245,17 @@ class Reproducing_Pairs(Model):
             # Interactions
             if channels[Reproducing_Pairs.STATE_CHANNEL] == 0:  # air
                 # if there is a seed in one communication channel, resulting in a new free lattice
-                if (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED >= 1).any().item():
-                    DNA = channels[Reproducing_Pairs.COMM_CHANNELS][channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED >= 1][0] - Reproducing_Pairs.SIGNAL_TRAVELLING_SEED
+                if (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED == 1).any().item():
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING
-                    channels[Reproducing_Pairs.DIR_CHANNEL] = DNA
+                    seed_index = index_of(channels, Reproducing_Pairs.SIGNAL_TRAVELLING_SEED, False)
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = seed_index
+                    channels[Reproducing_Pairs.DNA_CHANNEL] = channels[seed_index]
                     channels[Reproducing_Pairs.COMM_CHANNELS] = 0
 
                 elif (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_SEED == 1).any():
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
                     channels[Reproducing_Pairs.DIR_CHANNEL] = channels[channels // Reproducing_Pairs.SIGNAL_SEED == 1][0] % (Reproducing_Pairs.SIGNAL_SEED/10)
-                    channels[Reproducing_Pairs.DNA_CHANNEL] = (channels[channels // Reproducing_Pairs.SIGNAL_SEED == 1][0]-Reproducing_Pairs.SIGNAL_SEED) // (Reproducing_Pairs.SIGNAL_SEED/10) # ugly
+                    channels[Reproducing_Pairs.DNA_CHANNEL] = (channels[channels // Reproducing_Pairs.SIGNAL_SEED == 1][0]-Reproducing_Pairs.SIGNAL_SEED) // (Reproducing_Pairs.SIGNAL_SEED/10)  # ugly
                     channels[Reproducing_Pairs.COMM_CHANNELS] = 0
 
                 elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[Reproducing_Pairs.COMM_CHANNELS] and Reproducing_Pairs.SIGNAL_PAIR_RESERVATION not in channels[Reproducing_Pairs.COMM_CHANNELS]:
@@ -276,6 +276,7 @@ class Reproducing_Pairs(Model):
                         channels[torch.where(channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION)[0][torch.randint(0, torch.sum(channels[channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION])/Reproducing_Pairs.SIGNAL_PAIR_RESERVATION, (1,)).item()]] = channels[channels != Reproducing_Pairs.SIGNAL_PAIR_RESERVATION] = 0
                         channels[channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION] = 0
                         channels[Reproducing_Pairs.COMM_CHANNELS] = torch.roll(channels[Reproducing_Pairs.COMM_CHANNELS], 2)
+
                 # if it not a seed nor a reservation, absorb it
                 else:
                     channels[Reproducing_Pairs.COMM_CHANNELS] = 0
@@ -291,7 +292,7 @@ class Reproducing_Pairs(Model):
                 if Reproducing_Pairs.SIGNAL_MOVE in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     direction = channels[Reproducing_Pairs.DIR_CHANNEL].clone().item()
                     dna = channels[Reproducing_Pairs.DNA_CHANNEL].clone().item()
-                    ### if torch.distributions.Bernoulli(0.05).sample(torch.Size([1]))[0]: direction = torch.randint(0, 4, (1,)).item()
+                    if torch.distributions.Bernoulli(0.05).sample(torch.Size([1]))[0]: direction = torch.randint(0, 4, (1,)).item()
                     channels[:] = 0
                     channels[direction] = Reproducing_Pairs.SIGNAL_SEED + dna*Reproducing_Pairs.SIGNAL_SEED/10 + direction
 
@@ -310,11 +311,13 @@ class Reproducing_Pairs(Model):
                     channels[Reproducing_Pairs.COMM_CHANNELS] = torch.where(channels[Reproducing_Pairs.COMM_CHANNELS] == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION, Reproducing_Pairs.SIGNAL_PAIR_DISBAND, Reproducing_Pairs.SIGNAL_FLIP).to(torch.int16)
                     channels[dir_grabbed] = Reproducing_Pairs.SIGNAL_GRABED
 
-                elif (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED >= 1).any():
-                    seed = channels[channels // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED >= 1][0]
+                elif (channels[Reproducing_Pairs.COMM_CHANNELS] // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED == 1).any():
+                    seed = channels[channels // Reproducing_Pairs.SIGNAL_TRAVELLING_SEED == 1][0]
+                    direction = index_of(channels, seed)
                     channels[:] = 0
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING
-                    channels[Reproducing_Pairs.DIR_CHANNEL] = seed
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = direction
+                    channels[Reproducing_Pairs.DNA_CHANNEL] = seed
 
                 elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
@@ -348,7 +351,9 @@ class Reproducing_Pairs(Model):
 
                 if dir_grabed != -1 and pair_has_grabed != 0 and channels[Reproducing_Pairs.MEMORY_CHANNEL]:
                     # releasing the child !
-                    channels[dir_grabed] = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED*(channels[Reproducing_Pairs.DIR_CHANNEL]+1) + 10*5 + dir_grabed
+                    number_steps = 5
+                    # In a seed: 1000 + 100*pair_dir + 10*DNA + #steps left
+                    channels[dir_grabed] = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED + (Reproducing_Pairs.SIGNAL_TRAVELLING_SEED/10)*channels[Reproducing_Pairs.DIR_CHANNEL] + (Reproducing_Pairs.SIGNAL_TRAVELLING_SEED/100)*((channels[Reproducing_Pairs.DNA_CHANNEL]+2) % 4) + number_steps
                     channels[Reproducing_Pairs.STATE_CHANNEL] = -20
 
                 elif dir_grabed != -1:
@@ -367,36 +372,38 @@ class Reproducing_Pairs(Model):
                     channels[Reproducing_Pairs.MEMORY_CHANNEL] = 0
 
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_TRAVELLING:
-                # for travelling pairs, the dir_channel encode the direction of movement, the position of the pair and the number of steps left they have s.t: channel = pairdir*1000 + #steps*10 + dir
+                # In the DNA channel, I kept the seed intact. Therefore, it has for value: 1000+ 100*pair_dir + 10*dna + #steps
                 channels[Reproducing_Pairs.COMM_CHANNELS] = channels[Reproducing_Pairs.COMM_CHANNELS].roll(2)
-                pair_dir = (channels[Reproducing_Pairs.DIR_CHANNEL] // 1000) - 1
-                direction = channels[Reproducing_Pairs.DIR_CHANNEL] % 10
+                pair_dir, dna, steps = extract_digit(channels[Reproducing_Pairs.DNA_CHANNEL].clone(), 3)
+                direction = channels[Reproducing_Pairs.DIR_CHANNEL].clone().item()
 
                 # the pair is disbanded if it receives a grabing signal
                 if Reproducing_Pairs.SIGNAL_GRABING in channels[Reproducing_Pairs.COMM_CHANNELS] \
                         or Reproducing_Pairs.SIGNAL_PAIR_DISBAND in channels[Reproducing_Pairs.COMM_CHANNELS]:
                     channels[:] = 0
                     channels[pair_dir] = Reproducing_Pairs.SIGNAL_PAIR_DISBAND
-                    channels[Reproducing_Pairs.DIR_CHANNEL] = (pair_dir + 2) % 4
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = (pair_dir + 2) % 4
+                    channels[Reproducing_Pairs.DNA_CHANNEL] = dna
                     return channels
 
                 # if the pair has no steps left, they switch to the grabber state
-                elif (channels[Reproducing_Pairs.DIR_CHANNEL] % 1000) // 10 == 0:
+                elif steps == 0:
                     channels[:] = 0
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
                     channels[Reproducing_Pairs.DIR_CHANNEL] = pair_dir
+                    channels[Reproducing_Pairs.DNA_CHANNEL] = dna
                     return channels
 
                 is_resa_ok = Reproducing_Pairs.SIGNAL_MOVE in channels[Reproducing_Pairs.COMM_CHANNELS]
                 is_pair_ok = channels[pair_dir] == Reproducing_Pairs.SIGNAL_OK
 
                 # we move
-                if is_pair_ok and is_resa_ok and channels[Reproducing_Pairs.MEMORY_CHANNEL]:  # 10*number of steps + dir of the pair. Therefore, we substract 10 to remove 1 step.
-                    seed = Reproducing_Pairs.SIGNAL_TRAVELLING_SEED + channels[Reproducing_Pairs.DIR_CHANNEL] - 10
+                if is_pair_ok and is_resa_ok and channels[Reproducing_Pairs.MEMORY_CHANNEL]:
+                    seed = channels[Reproducing_Pairs.DNA_CHANNEL] - 1
+                    channels[:] = 0
                     channels[direction] = seed
                     channels[pair_dir] = Reproducing_Pairs.SIGNAL_OK
-                    channels[channels != seed] = 0
                     return channels
 
                 channels[Reproducing_Pairs.COMM_CHANNELS] = 0
@@ -421,25 +428,25 @@ class Reproducing_Pairs(Model):
         init = torch.zeros((W, H, 11), dtype=torch.int16)
 
         # Random simulation
-        # init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
-        # init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DIR_CHANNEL])
-        # init[:, :, Reproducing_Pairs.DNA_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DNA_CHANNEL])
+        init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
+        init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DIR_CHANNEL])
+        init[:, :, Reproducing_Pairs.DNA_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DNA_CHANNEL])
 
         # toy example horizontal
-        init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 2
-        init[10, 5, Reproducing_Pairs.STATE_CHANNEL], init[10, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 0
-        init[11, 4, Reproducing_Pairs.STATE_CHANNEL], init[11, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 2
-        init[0, 4, Reproducing_Pairs.STATE_CHANNEL], init[0, 4, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
+        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 3
+        # init[10, 5, Reproducing_Pairs.STATE_CHANNEL], init[10, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 1
+        # init[4, 4, Reproducing_Pairs.STATE_CHANNEL], init[4, 4, Reproducing_Pairs.DIR_CHANNEL], init[4, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 1
+        # init[11, 4, Reproducing_Pairs.STATE_CHANNEL], init[11, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 3
 
         # toy example travelling pair
         # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 3040
         # init[5, 6, Reproducing_Pairs.STATE_CHANNEL], init[5, 6, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 1040
 
         # toy example vertical
-        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = 1, 3
-        # init[5, 10, Reproducing_Pairs.STATE_CHANNEL], init[5, 10, Reproducing_Pairs.DIR_CHANNEL] = 1, 1
-        # init[6, 2, Reproducing_Pairs.STATE_CHANNEL], init[6, 2, Reproducing_Pairs.DIR_CHANNEL] = 1, 3
-        # init[6, 15, Reproducing_Pairs.STATE_CHANNEL], init[6, 15, Reproducing_Pairs.DIR_CHANNEL] = 1, 1
+        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 0
+        # init[5, 10, Reproducing_Pairs.STATE_CHANNEL], init[5, 10, Reproducing_Pairs.DIR_CHANNEL], init[5, 10, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 1
+        # init[6, 2, Reproducing_Pairs.STATE_CHANNEL], init[6, 2, Reproducing_Pairs.DIR_CHANNEL], init[6, 2, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 2
+        # init[6, 15, Reproducing_Pairs.STATE_CHANNEL], init[6, 15, Reproducing_Pairs.DIR_CHANNEL], init[6, 15, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 3
         return init
 
     def draw_function(self, world):
@@ -460,6 +467,12 @@ class Reproducing_Pairs(Model):
                           travelling_lattices_mask*1.0 + in_move_lattices_mask*0.5 + recovery_lattices_mask*1.0]).transpose((1, 2, 0))
         return res
 
+def extract_digit(value, channels_number):
+    res = []
+    for i in range(channels_number):
+        res.insert(0, value % 10)
+        value //= 10
+    return res
 
 def index_of(tensor, value, is_simple_signal=True):
     """
