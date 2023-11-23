@@ -209,7 +209,6 @@ class Reproducing_Pairs(Model):
 
     Fixme Known bugs:
         - DNA is lost for travelling pairs
-        - on: right - up - left, the reservation signal passes through the up, and the two free cells therefore become grabbers but are 1 cell appart
 
     optimization / pbs to fix:
         - One could simply do a dictionnary that contains the the mapping function
@@ -283,6 +282,12 @@ class Reproducing_Pairs(Model):
 
             # moving lattices interactions
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_FREE:
+                # absorbtion of the reservation signals
+                channels[(
+                    ((channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION) | (channels == Reproducing_Pairs.SIGNAL_RESERVATION)) &
+                    (torch.arange(len(channels)).to(channels.device) != ((channels[Reproducing_Pairs.DIR_CHANNEL]+2)%4))
+                )] = 0
+
                 if Reproducing_Pairs.SIGNAL_MOVE in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     direction = channels[Reproducing_Pairs.DIR_CHANNEL].clone().item()
                     dna = channels[Reproducing_Pairs.DNA_CHANNEL].clone().item()
@@ -333,6 +338,7 @@ class Reproducing_Pairs(Model):
                 channels[Reproducing_Pairs.COMM_CHANNELS] = Reproducing_Pairs.SIGNAL_FLIP
                 channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = 0
 
+                # This is the counter for the recovery, after the release of a child
                 if channels[Reproducing_Pairs.STATE_CHANNEL] < -1:
                     channels[Reproducing_Pairs.STATE_CHANNEL] += 1
                     return channels
@@ -353,11 +359,11 @@ class Reproducing_Pairs(Model):
                 elif pair_has_grabed:
                     # we need to determine whether we are searching for up or down, now that the pair has a grab
                     dir_to_grab = (1 if pair_has_grabed == Reproducing_Pairs.SIGNAL_HAS_GRABED[0] else 3) - (channels[Reproducing_Pairs.DIR_CHANNEL] % 2)
-                    channels[dir_to_grab % 4] = Reproducing_Pairs.SIGNAL_GRABING
+                    channels[dir_to_grab % 4] = Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL]
 
                 else:
                     # we try to grab up and down
-                    channels[(channels[Reproducing_Pairs.DIR_CHANNEL] - 1) % 4], channels[(channels[Reproducing_Pairs.DIR_CHANNEL] + 1) % 4] = Reproducing_Pairs.SIGNAL_GRABING, Reproducing_Pairs.SIGNAL_GRABING
+                    channels[(channels[Reproducing_Pairs.DIR_CHANNEL] - 1) % 4], channels[(channels[Reproducing_Pairs.DIR_CHANNEL] + 1) % 4] = Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL], Reproducing_Pairs.SIGNAL_GRABING + channels[Reproducing_Pairs.DNA_CHANNEL]
                     channels[Reproducing_Pairs.MEMORY_CHANNEL] = 0
 
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_TRAVELLING:
@@ -375,7 +381,7 @@ class Reproducing_Pairs(Model):
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
                     return channels
 
-                # if the pair has no steps left, they switch to the grabber state todo: pas logique de le faire là, plutot jouer avec la seed
+                # if the pair has no steps left, they switch to the grabber state
                 elif (channels[Reproducing_Pairs.DIR_CHANNEL] % 1000) // 10 == 0:
                     channels[:] = 0
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
@@ -419,11 +425,11 @@ class Reproducing_Pairs(Model):
         # init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DIR_CHANNEL])
         # init[:, :, Reproducing_Pairs.DNA_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DNA_CHANNEL])
 
-        # toy example horizontal todo: tester qu'il rebondisse bien avec la partie qui n'a pas encore grab
-        init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
-        init[10, 5, Reproducing_Pairs.STATE_CHANNEL] = 1
+        # toy example horizontal
+        init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 2
+        init[10, 5, Reproducing_Pairs.STATE_CHANNEL], init[10, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 0
         init[11, 4, Reproducing_Pairs.STATE_CHANNEL], init[11, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 2
-        init[8, 2, Reproducing_Pairs.STATE_CHANNEL], init[8, 2, Reproducing_Pairs.DIR_CHANNEL] = 1, 3
+        init[0, 4, Reproducing_Pairs.STATE_CHANNEL], init[0, 4, Reproducing_Pairs.DIR_CHANNEL] = 1, 2
 
         # toy example travelling pair
         # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 3040

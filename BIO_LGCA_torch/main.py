@@ -82,10 +82,10 @@ while running:
 
     # Draw the scaled surface on the window (zoomed)
     # Understanding how the camera works is not important
-    zoomed_surface = camera.apply(surface)
+    #zoomed_surface = camera.apply(surface)
 
     # Blit (draw) the surface on the screen, at (0,0) coordinates
-    screen.blit(zoomed_surface, (0, 0))
+    screen.blit(surface, (0, 0))
 
     # 'flips' the display to show it on the screen
     pygame.display.flip()
