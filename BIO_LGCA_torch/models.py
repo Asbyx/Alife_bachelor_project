@@ -211,7 +211,8 @@ class Reproducing_Pairs(Model):
         - One could simply do a dictionnary that contains the the mapping function
         - The comm channels should be reset by default
 
-    Fixme Current bug to be solved: in the random simulation, the grabber don't grab for some reason, while in the toy examples it works fine.
+    fixme known issues:
+        - A pair moving encountering a free in front of it is glitched
     """
     # signal codes
     SIGNAL_OK = 1
@@ -239,6 +240,7 @@ class Reproducing_Pairs(Model):
     DIR_CHANNEL = 5
     DNA_CHANNEL = 6  # Can be 0,1,2, or 3; to represent A,T,G,C
     MEMORY_CHANNEL = 7  # If the lattice has to remember a previous information
+    CLOCK_CHANNEL = 8
 
     def interaction_function(self, world):
         def fct(channels):
@@ -322,6 +324,7 @@ class Reproducing_Pairs(Model):
 
                 elif Reproducing_Pairs.SIGNAL_RESERVATION in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]:
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
+                    channels[Reproducing_Pairs.CLOCK_CHANNEL] = 5 * self.size[0]
                     channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_RESERVATION
 
                 elif Reproducing_Pairs.SIGNAL_FLIP in channels[int(((channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4).item())]\
@@ -335,8 +338,18 @@ class Reproducing_Pairs(Model):
                     or channels[Reproducing_Pairs.STATE_CHANNEL] < 0:
                 channels[Reproducing_Pairs.COMM_CHANNELS] = channels[Reproducing_Pairs.COMM_CHANNELS].roll(2)  # allow to have the correct directions right away
                 # retrieve the important signals, i.e the signal coming from the pair and the signal of a grabbed particle
-                dir_grabed = index_of(channels, Reproducing_Pairs.SIGNAL_GRABED)
+                dir_grabed = index_of(channels[Reproducing_Pairs.COMM_CHANNELS], Reproducing_Pairs.SIGNAL_GRABED)
                 pair_has_grabed = channels[Reproducing_Pairs.COMM_CHANNELS][channels[Reproducing_Pairs.DIR_CHANNEL]] if channels[Reproducing_Pairs.COMM_CHANNELS][channels[Reproducing_Pairs.DIR_CHANNEL]] in Reproducing_Pairs.SIGNAL_HAS_GRABED else 0
+
+                # handle the clock
+                channels[Reproducing_Pairs.CLOCK_CHANNEL] -= 1
+                if channels[Reproducing_Pairs.STATE_CHANNEL] > 0 and channels[Reproducing_Pairs.CLOCK_CHANNEL] < 0 or channels[channels[Reproducing_Pairs.DIR_CHANNEL]] == Reproducing_Pairs.SIGNAL_PAIR_DISBAND:
+                    channels[Reproducing_Pairs.COMM_CHANNELS] = 0
+                    channels[channels[Reproducing_Pairs.DIR_CHANNEL]] = Reproducing_Pairs.SIGNAL_PAIR_DISBAND
+                    channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_FREE
+                    channels[Reproducing_Pairs.DIR_CHANNEL] = (channels[Reproducing_Pairs.DIR_CHANNEL] + 2) % 4
+                    return channels
+
 
                 # we set the message by default to be "FLIP", except for the pair
                 channels[Reproducing_Pairs.COMM_CHANNELS] = Reproducing_Pairs.SIGNAL_FLIP
@@ -348,9 +361,11 @@ class Reproducing_Pairs(Model):
                     return channels
                 elif channels[Reproducing_Pairs.STATE_CHANNEL] == -1:
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
+                    channels[Reproducing_Pairs.CLOCK_CHANNEL] = 5*self.size[0]
                     return channels
 
                 if dir_grabed != -1 and pair_has_grabed != 0 and channels[Reproducing_Pairs.MEMORY_CHANNEL]:
+                    print("Reproduction !")
                     # releasing the child !
                     number_steps = 5
                     # In a seed: 1000 + 100*pair_dir + 10*DNA + #steps left
@@ -391,6 +406,7 @@ class Reproducing_Pairs(Model):
                 elif steps == 0:
                     channels[:] = 0
                     channels[Reproducing_Pairs.STATE_CHANNEL] = Reproducing_Pairs.STATE_GRABBER
+                    channels[Reproducing_Pairs.CLOCK_CHANNEL] = 5*self.size[0]
                     channels[Reproducing_Pairs.DIR_CHANNEL] = pair_dir
                     channels[Reproducing_Pairs.DNA_CHANNEL] = dna
                     return channels
@@ -423,30 +439,39 @@ class Reproducing_Pairs(Model):
         return world
 
     def init_world(self, W, H, nb_lattices=None):
-        if nb_lattices is None: nb_lattices = W*2
+        if nb_lattices is None: nb_lattices = W*3
         self.size = (W, H)
-        init = torch.zeros((W, H, 8), dtype=torch.int16)
+        init = torch.zeros((W, H, 9), dtype=torch.int16)
+
+        rand = True
+        hori = False
+        verti = False
+        travel = False
 
         # Random simulation
-        init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
-        init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DIR_CHANNEL])
-        init[:, :, Reproducing_Pairs.DNA_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DNA_CHANNEL])
+        if rand:
+            init[torch.randint(0, W, (nb_lattices,)), torch.randint(0, H, (nb_lattices,)), Reproducing_Pairs.STATE_CHANNEL] = 1
+            init[:, :, Reproducing_Pairs.DIR_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DIR_CHANNEL])
+            init[:, :, Reproducing_Pairs.DNA_CHANNEL] = torch.where(init[:, :, Reproducing_Pairs.STATE_CHANNEL] == 1, torch.randint(0, 4, self.size), init[:, :, Reproducing_Pairs.DNA_CHANNEL])
 
         # toy example horizontal
-        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 3
-        # init[10, 5, Reproducing_Pairs.STATE_CHANNEL], init[10, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 1
-        # init[4, 4, Reproducing_Pairs.STATE_CHANNEL], init[4, 4, Reproducing_Pairs.DIR_CHANNEL], init[4, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 1
-        # init[11, 4, Reproducing_Pairs.STATE_CHANNEL], init[11, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 3
-
-        # toy example travelling pair
-        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 3040
-        # init[5, 6, Reproducing_Pairs.STATE_CHANNEL], init[5, 6, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 1040
+        if hori:
+            init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 3
+            init[10, 5, Reproducing_Pairs.STATE_CHANNEL], init[10, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 1
+            # init[4, 4, Reproducing_Pairs.STATE_CHANNEL], init[4, 4, Reproducing_Pairs.DIR_CHANNEL], init[4, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 2, 1
+            init[11, 4, Reproducing_Pairs.STATE_CHANNEL], init[11, 4, Reproducing_Pairs.DNA_CHANNEL] = 1, 3
 
         # toy example vertical
-        # init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 0
-        # init[5, 10, Reproducing_Pairs.STATE_CHANNEL], init[5, 10, Reproducing_Pairs.DIR_CHANNEL], init[5, 10, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 1
-        # init[6, 2, Reproducing_Pairs.STATE_CHANNEL], init[6, 2, Reproducing_Pairs.DIR_CHANNEL], init[6, 2, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 2
-        # init[6, 3, Reproducing_Pairs.STATE_CHANNEL], init[6, 3, Reproducing_Pairs.DIR_CHANNEL], init[6, 3, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 3
+        if verti:
+            init[5, 5, Reproducing_Pairs.STATE_CHANNEL],  init[5, 5, Reproducing_Pairs.DIR_CHANNEL], init[5, 5, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 0
+            init[5, 10, Reproducing_Pairs.STATE_CHANNEL], init[5, 10, Reproducing_Pairs.DIR_CHANNEL], init[5, 10, Reproducing_Pairs.DNA_CHANNEL] = 1, 1, 1
+            init[6, 2, Reproducing_Pairs.STATE_CHANNEL], init[6, 2, Reproducing_Pairs.DIR_CHANNEL], init[6, 2, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 2
+            init[6, 3, Reproducing_Pairs.STATE_CHANNEL], init[6, 3, Reproducing_Pairs.DIR_CHANNEL], init[6, 3, Reproducing_Pairs.DNA_CHANNEL] = 1, 3, 3
+
+        # toy example travelling pair
+        if travel:
+            init[5, 5, Reproducing_Pairs.STATE_CHANNEL], init[5, 5, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 3040
+            init[5, 6, Reproducing_Pairs.STATE_CHANNEL], init[5, 6, Reproducing_Pairs.DIR_CHANNEL] = Reproducing_Pairs.STATE_TRAVELLING, 1040
         return init
 
     def draw_function(self, world):

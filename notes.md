@@ -55,12 +55,14 @@ Pour l'autre direction, aka les bulles qui envoient des oeufs, on verra plus tar
 
 Les pistes pour continuer actuellement: 
 - implémenter la séparation du child *(fait)*
-- faire la différenciation des particules (A, T, G, C) *(en cours)*
-- mort des paires au bout d'un moment 
+- faire la différenciation des particules (A, T, G, C) *(fait)*
+- mort des paires au bout d'un moment *(en cours)*
+- chaînes plus longues ?
 - faire un meilleur code parce que là c'est catastrophique:
   - Séparer les interactions dans des sous-fonctions, pour que ce soit lisible et + facile de modifier un comportement spécifique
   - Mettre plus de channels dans les comm channels pour pouvoir faire passer + d'infos
   - Tout passer en bit signals pour implémenter l'optimisation par dictionnaire
+  - Refaire en Java ? en soi j'ai juste besoin de créer une window qui me permet d'afficher des pixels, ou tout enregistré et mettre dans une vidéo
 
 
 # Meeting Vass 23 novembre
@@ -69,6 +71,11 @@ Pour les chaînes plus longues, on a brainstormé un peu, la solution la + simpl
 Et pour détecter quand bouger, le plus simple serait de trouver un moyen pour les lattices d'une chaîne de connaître la longueur de leur chaîne. Puis quand quand la chaîne fille se rend compte qu'elle a la longueur de la chaîne mère, elle se décroche. Ou alors une fois que tous les lattices parents acknowledgent qu'ils ont grab, on relâche un lattice child au pif, puis l'elasticité fera le reste (les bouts de chaines préviennent quand ils ont bougé permettant au leader de la chaine d'avancer quand tout le monde est là).   
 Le plus gros problème c'est les obstacles. Mais en y réfléchissant, c'est pas trop un problème car les free vont juste dégager au bout d'un moment, permettant à l'elasticité de continuer. Sauf si on rencontre une autre chaîne fixée, mais on pourrait du coup dissoudre la chaîne qui voyage, où une chaîne qui bouge, là c'est plus relou. Une solution ce serait de faire des réservations et de ne bouger que lorsque tout le monde est prêt.
 Reflexion to be continued.
+
+
+# Meeting Vass 30 novembre
+La différenciation a été effectuée ! Mais du coup on a très très peu de paires qui arrivent à se reproduire (calculer la proba est faisable et intéressant ?).
+Je démarre le coding de la mort des paires, décidé à 5xlongueur_coté.
 
 ### Séparation du child:
 La grosse difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  

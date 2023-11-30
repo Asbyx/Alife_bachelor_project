@@ -8,9 +8,9 @@ import cv2
 import time
 
 # Initialize the automaton
-W, H = 51, 51
+W, H = 19, 19
 model = Reproducing_Pairs()
-auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H, nb_lattices=200), model.interaction_function, model.draw_function)
+auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
 # =============================================================================
 
 # Initialize the pygame screen
