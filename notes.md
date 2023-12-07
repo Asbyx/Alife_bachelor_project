@@ -56,7 +56,7 @@ Pour l'autre direction, aka les bulles qui envoient des oeufs, on verra plus tar
 Les pistes pour continuer actuellement: 
 - implémenter la séparation du child *(fait)*
 - faire la différenciation des particules (A, T, G, C) *(fait)*
-- mort des paires au bout d'un moment *(en cours)*
+- mort des paires au bout d'un moment *(fait)*
 - chaînes plus longues ?
 - faire un meilleur code parce que là c'est catastrophique:
   - Séparer les interactions dans des sous-fonctions, pour que ce soit lisible et + facile de modifier un comportement spécifique
@@ -75,7 +75,13 @@ Reflexion to be continued.
 
 # Meeting Vass 30 novembre
 La différenciation a été effectuée ! Mais du coup on a très très peu de paires qui arrivent à se reproduire (calculer la proba est faisable et intéressant ?).
-Je démarre le coding de la mort des paires, décidé à 5xlongueur_coté.
+Je démarre le coding de la mort des paires, décidé à 5xlongueur_coté_monde
+
+
+# Meeting Vass 7 decembre
+Les reproductibles pairs sont finies ! La mort a été implémentée, ça permet aussi d'avoir plus de reproduction overall. Par contre, vu que la complexité du modèle a drastiquement augmenté, c'est plus difficile de se rendre compte de l'apparition de comportements complexes.  
+Prochaine étape: faire un Game Of Life ! Parce que ça permettra de bien montrer que le modèle est capable de faire des simulations physiques, des CA et de la simulation de particules.  
+Après ça, rédaction du rapport à fond ! 
 
 ### Séparation du child:
 La grosse difficulté est de faire bouger une paire de lattice en gérant les collisions. Dans la vie réelle d'ailleurs ça n'existe pas trop donc on peut laisser tomber.  

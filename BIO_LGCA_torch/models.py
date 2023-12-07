@@ -285,8 +285,6 @@ class Reproducing_Pairs(Model):
 
             # moving lattices interactions
             elif channels[Reproducing_Pairs.STATE_CHANNEL] == Reproducing_Pairs.STATE_FREE:
-                if torch.distributions.Bernoulli(0.01).sample(torch.Size([1]))[0]: channels[Reproducing_Pairs.DIR_CHANNEL] = torch.randint(0, 4, (1,)).item()
-
                 # absorbtion of the reservation signals
                 channels[(
                     ((channels == Reproducing_Pairs.SIGNAL_PAIR_RESERVATION) | (channels == Reproducing_Pairs.SIGNAL_RESERVATION)) &
@@ -365,7 +363,8 @@ class Reproducing_Pairs(Model):
                     return channels
 
                 if dir_grabed != -1 and pair_has_grabed != 0 and channels[Reproducing_Pairs.MEMORY_CHANNEL]:
-                    print("Reproduction !")
+                    self.reproductions_number += 1
+                    if self.reproductions_number % 2 == 0: print(f"Number of reproductions: {self.reproductions_number/2}")
                     # releasing the child !
                     number_steps = 5
                     # In a seed: 1000 + 100*pair_dir + 10*DNA + #steps left
@@ -441,6 +440,7 @@ class Reproducing_Pairs(Model):
     def init_world(self, W, H, nb_lattices=None):
         if nb_lattices is None: nb_lattices = W*3
         self.size = (W, H)
+        self.reproductions_number = 0
         init = torch.zeros((W, H, 9), dtype=torch.int16)
 
         rand = True
