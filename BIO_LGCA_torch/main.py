@@ -1,16 +1,16 @@
-import pygame
-import torch
-
-from Camera import Camera
-from Automaton import *
-from models import *
 import cv2
-import time
+import pygame
+
+from Automaton import *
+from Camera import Camera
+from models import *
 
 # Initialize the automaton
-W, H = 19, 19
-model = Reproducing_Pairs()
-auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H), model.interaction_function, model.draw_function)
+W, H = 500, 500
+custom = torch.randint(0, 2, (W, H), dtype=torch.int8, device=torch.device("cuda"))
+model = Game_Of_Life()
+auto = BioLgcaSquaredAuto((W, H), model.init_world(W, H, custom=custom), model.interaction_function, model.draw_function)
+auto.transport()  # necessary for the game of life, to be commented otherwise
 # =============================================================================
 
 # Initialize the pygame screen

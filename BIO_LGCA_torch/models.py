@@ -210,9 +210,6 @@ class Reproducing_Pairs(Model):
     optimization / pbs to fix:
         - One could simply do a dictionnary that contains the the mapping function
         - The comm channels should be reset by default
-
-    fixme known issues:
-        - A pair moving encountering a free in front of it is glitched
     """
     # signal codes
     SIGNAL_OK = 1
@@ -491,6 +488,61 @@ class Reproducing_Pairs(Model):
                           (G_lattices_mask*1.0 + C_lattices_mask*0.8)*(1-grabber_lattices_mask*0.3) + in_move_lattices_mask*0.5 + recovery_lattices_mask*1.0,
                           travelling_lattices_mask*1.0 + in_move_lattices_mask*0.5 + recovery_lattices_mask*1.0]).transpose((1, 2, 0))
         return res
+
+
+class Game_Of_Life(Model):
+    """
+    2 rest channels:
+    - state of the cell
+    - previous sum
+
+    interaction:
+        if previous sum = 0:
+            store the sum of comm channels in previous sum channel
+            update comm channels s.t. comm = sum of orthogonal comm channels (1 = 3 = 0+2; 0 = 2 = 1+3)
+        else:
+            compute previous sum + (sum of comms /2)
+            update state according
+            previous sum = 0
+
+        current problem: on initialisation, the information for the neighbors isn't transmitted (in automaton, interaction then migration)
+    """
+    def interaction_function(self, world):
+        self.step = not self.step
+        if self.step:
+            world[:, :, 5] = world[:, :, 0] + world[:, :, 1] + world[:, :, 2] + world[:, :, 3]
+            temp = world[:, :, 0] + world[:, :, 2]
+            world[:, :, 0] = world[:, :, 2] = world[:, :, 1] + world[:, :, 3]
+            world[:, :, 1] = world[:, :, 3] = temp
+        else:
+            world[:, :, 5] = world[:, :, 5] + ((world[:, :, 0] + world[:, :, 1] + world[:, :, 2] + world[:, :, 3])/2).to(torch.int8)
+            world[:, :, 4] = torch.where(((world[:, :, 5] == 3) | (world[:, :, 4] & (world[:, :, 5] == 2))).to(torch.bool), 1, 0)
+            world[:, :, 5] = 0
+            world[:, :, 0] = world[:, :, 1] = world[:, :, 2] = world[:, :, 3] = world[:, :, 4]
+        return world
+
+    def init_world(self, W, H, custom=None):
+        self.step = False
+        init = torch.zeros((W, H, 6), dtype=torch.int8)
+        if custom is None:
+            init[5:8, 3, 4] = 1
+            init[5:7, 6:8, 4] = 1
+        else: init[:, :, 4] = custom
+
+        init[:, :, 0] = init[:, :, 1] = init[:, :, 2] = init[:, :, 3] = torch.where(init[:, :, 4] == 1, 1, 0)
+        return init
+
+    def draw_function(self, world):
+        # Convert the boolean array to a uint8 NumPy array
+        numpy_array = world[:, :, 4].astype(np.uint8)
+
+        # Add an extra dimension for the third channel
+        numpy_array = np.expand_dims(numpy_array, axis=-1)
+
+        # Repeat the third channel to make it (w, h, 3)
+        res = np.repeat(numpy_array, 3, axis=-1)
+        return res
+
 
 def extract_digit(value, channels_number):
     res = []
