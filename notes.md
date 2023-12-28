@@ -142,5 +142,3 @@ J'aimerais bien faire de la recherche sur un algo simples qui trouve des solutio
 L'oral doit intéresser clément, il est intéressé par un petit talk (arn = intéressé de fou).
 Date: le plus tard c'est le mieux parce que ça donne le temps de faire des choses.
 Il veut pas que je le fasse pour la note, il veut que je le fasse parce que c'est un talk intéressant.
-
-comment augmenter le fond d'un labo à l'epfl ? clément: la négociation et le chantage
